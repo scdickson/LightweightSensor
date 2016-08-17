@@ -1,0 +1,646 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="http://www.netscout.com/wp-content/themes/netscout/favicon.ico">
+
+    <title>Defcon Sensor Live Data</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.2.0/Chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.2.0/Chart.bundle.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/live/3.0/firebase.js"></script>
+    <script>
+      // Initialize Firebase
+      var config = {
+        apiKey: "AIzaSyDmD-Eye5CcB5sJBBqYaViCeCjpFwMsJ4o",
+        authDomain: "ns-sniffer.firebaseapp.com",
+        databaseURL: "https://ns-sniffer.firebaseio.com",
+        storageBucket: "ns-sniffer.appspot.com",
+      };
+      firebase.initializeApp(config);
+    </script>
+
+    <!-- Bootstrap core CSS -->
+    <link href="scripts/bootstrap.min.css" rel="stylesheet">
+
+    <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+    <link href="scripts/ie10-viewport-bug-workaround.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="scripts/dashboard.css" rel="stylesheet">
+
+    <!-- Just for debugging purposes. Don't actually copy these 2 lines! -->
+    <!--[if lt IE 9]><script src="../../assets/js/ie8-responsive-file-warning.js"></script><![endif]-->
+    <script src="scripts/ie-emulation-modes-warning.js"></script>
+
+    <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+    <script type="text/javascript">
+      /*firebase.database().ref('wbscan').once('value', function(snapshot)
+      {
+        var obj = snapshot.val();
+        var image_url = obj.wbscan_image_url;
+        var time = obj.time_of_scan
+        var sensorid = obj.sensor
+
+        var content = "<img src=\"" + image_url + "\"/></br></br>";
+        content += "<div align=\"left\"><table cellpadding=10 border=1px><tr><td><b>Sensor</b>:</td><td>" + sensorid + "</td></tr><tr><td><b>Time</b>:</td><td>" + time + "</td></tr><tr><td><b>Range</b>:</td><td>25 MHz - 1400 MHz</td></tr><tr><td><b>Gain</b>:</td><td>25 db</td></tr><tr><td><b>Bin Size</b>: </td><td>1 MHz</td></tr></table>";
+        console.log(content);
+        document.getElementById('wbsurvey').innerHTML = content;
+
+      });*/
+    </script>
+  </head>
+
+  <body>
+
+    <nav class="navbar navbar-inverse navbar-fixed-top">
+      <div class="container-fluid">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand">Defcon Live Sensor</a>
+        </div>
+        <div id="navbar" class="navbar-collapse collapse">
+
+        </div>
+      </div>
+    </nav>
+
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-sm-3 col-md-2 sidebar">
+          <ul class="nav nav-sidebar">
+            <li><a href="index.html">Overview <span class="sr-only">(current)</span></a></li>
+            <li class="active"><a href="#">802.11</a></li>
+            <li><a href="bluetooth.html">Bluetooth</a></li>
+          </ul>
+        </div>
+        <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+          <h1 class="page-header">802.11 Data</h1>
+
+          <div class="row placeholders">
+            <div class="col-xs-6 col-sm-3 placeholder">
+              <h4>APs by Channel</h4><br/>
+              <canvas id="apChannelChart" width="400" height="400"></canvas>
+              <script>
+              Chart.defaults.global.legend.display = false;
+              var cuniqueDevices = [];
+              var channelCount = {};
+              var channelkeys = [];
+              var channelvalues = [];
+              var channelcolors = [];
+
+              firebase.database().ref('ap_observations').once('value', function(snapshot)
+              {
+                snapshot.forEach(function(childSnapshot)
+                {
+                  var key = childSnapshot.key;
+                  var childData = childSnapshot.val();
+                  var hour = parseInt(childData.date.split(" ")[1].split(":")[0]);
+
+                  for(var k in childData.APs)
+                  {
+                    var channel = 'Channel ' + childData.APs[k]['channel'];
+                    if(channel != 'Channel Unknown' && cuniqueDevices.indexOf(childData.APs[k]['BSSID']) < 0)
+                    {
+                      cuniqueDevices.push(childData.APs[k]['BSSID']);
+                      if(!channelCount[channel])
+                      {
+                        channelCount[channel] = 1;
+                      }
+                      else
+                      {
+                          channelCount[channel] += 1;
+                      }
+                    }
+
+                  }
+                });
+
+                for(var k in channelCount)
+                {
+                  channelkeys.push(k);
+                  channelvalues.push(channelCount[k]);
+                  channelcolors.push('#'+Math.floor(Math.random()*16777215).toString(16));
+                }
+
+                var ctx = document.getElementById("apChannelChart");
+                var data = {
+                    labels: channelkeys,
+                    datasets: [
+                        {
+                            data: channelvalues,
+                            backgroundColor: channelcolors,
+                            hoverBackgroundColor: channelcolors
+                        }]
+                };
+                new Chart(ctx,{
+                  type:"doughnut",
+                  data: data,
+                  animation:{
+                      animateScale:true
+                  }
+                });
+              });
+              </script>
+            </div>
+            <div class="col-xs-6 col-sm-3 placeholder">
+              <h4>APs by Privacy</h4><br/>
+              <canvas id="apPrivacyChart" width="400" height="400"></canvas>
+              <script>
+              Chart.defaults.global.legend.display = false;
+              var puniqueDevices = [];
+              var privCount = {};
+              var privkeys = [];
+              var privvalues = [];
+              var privcolors = [];
+
+              firebase.database().ref('ap_observations').once('value', function(snapshot)
+              {
+                snapshot.forEach(function(childSnapshot)
+                {
+                  var key = childSnapshot.key;
+                  var childData = childSnapshot.val();
+                  var hour = parseInt(childData.date.split(" ")[1].split(":")[0]);
+
+                  for(var k in childData.APs)
+                  {
+                    var privacy =  childData.APs[k]['privacy'];
+                    if(privacy != 'Unknown' && puniqueDevices.indexOf(childData.APs[k]['BSSID']) < 0)
+                    {
+                      puniqueDevices.push(childData.APs[k]['BSSID']);
+                      if(!privCount[privacy])
+                      {
+                        privCount[privacy] = 1;
+                      }
+                      else
+                      {
+                          privCount[privacy] += 1;
+                      }
+                    }
+
+                  }
+                });
+
+                for(var k in privCount)
+                {
+                  privkeys.push(k);
+                  privvalues.push(privCount[k]);
+                  privcolors.push('#'+Math.floor(Math.random()*16777215).toString(16));
+                }
+
+                var ctx = document.getElementById("apPrivacyChart");
+                var data = {
+                    labels: privkeys,
+                    datasets: [
+                        {
+                            data: privvalues,
+                            backgroundColor: privcolors,
+                            hoverBackgroundColor: privcolors
+                        }]
+                };
+                new Chart(ctx,{
+                  type:"doughnut",
+                  data: data,
+                  animation:{
+                      animateScale:true
+                  }
+                });
+              });
+              </script>
+
+            </div>
+            <div class="col-xs-6 col-sm-3 placeholder">
+              <h4>APs by Manufacturer</h4><br/>
+              <canvas id="apManufacturerChart" width="400" height="400"></canvas>
+              <script>
+              Chart.defaults.global.legend.display = false;
+              var muniqueDevices = [];
+              var manuCount = {};
+              var manukeys = [];
+              var manuvalues = [];
+              var manucolors = [];
+
+              firebase.database().ref('ap_observations').once('value', function(snapshot)
+              {
+                snapshot.forEach(function(childSnapshot)
+                {
+                  var key = childSnapshot.key;
+                  var childData = childSnapshot.val();
+                  var hour = parseInt(childData.date.split(" ")[1].split(":")[0]);
+
+                  for(var k in childData.APs)
+                  {
+                    var manufacturer =  childData.APs[k]['manufacturer'];
+                    if(manufacturer != 'Unknown' && muniqueDevices.indexOf(childData.APs[k]['BSSID']) < 0)
+                    {
+                      muniqueDevices.push(childData.APs[k]['BSSID']);
+                      if(!manuCount[manufacturer])
+                      {
+                        manuCount[manufacturer] = 1;
+                      }
+                      else
+                      {
+                          manuCount[manufacturer] += 1;
+                      }
+                    }
+
+                  }
+                });
+
+                for(var k in manuCount)
+                {
+                  manukeys.push(k);
+                  manuvalues.push(manuCount[k]);
+                  manucolors.push('#'+Math.floor(Math.random()*16777215).toString(16));
+                }
+
+                var ctx = document.getElementById("apManufacturerChart");
+                var data = {
+                    labels: manukeys,
+                    datasets: [
+                        {
+                            data: manuvalues,
+                            backgroundColor: manucolors,
+                            hoverBackgroundColor: manucolors
+                        }]
+                };
+                new Chart(ctx,{
+                  type:"doughnut",
+                  data: data,
+                  animation:{
+                      animateScale:true
+                  }
+                });
+              });
+              </script>
+            </div>
+            <div class="col-xs-6 col-sm-3 placeholder">
+              <h4>Stations by Manufacturer</h4><br/>
+              <canvas id="stationManufacturerChart" width="400" height="400"></canvas>
+              <script>
+              Chart.defaults.global.legend.display = false;
+              var smuniqueDevices = [];
+              var smanuCount = {};
+              var smanukeys = [];
+              var smanuvalues = [];
+              var smanucolors = [];
+
+              firebase.database().ref('station_observations').once('value', function(snapshot)
+              {
+                snapshot.forEach(function(childSnapshot)
+                {
+                  var key = childSnapshot.key;
+                  var childData = childSnapshot.val();
+                  var hour = parseInt(childData.date.split(" ")[1].split(":")[0]);
+
+                  for(var k in childData.stations)
+                  {
+                    var smanufacturer =  childData.stations[k]['manufacturer'];
+                    if(smanufacturer != 'Unknown' && smuniqueDevices.indexOf(childData.stations[k]['BSSID']) < 0)
+                    {
+                      smuniqueDevices.push(childData.stations[k]['BSSID']);
+                      if(!smanuCount[smanufacturer])
+                      {
+                        smanuCount[smanufacturer] = 1;
+                      }
+                      else
+                      {
+                          smanuCount[smanufacturer] += 1;
+                      }
+                    }
+
+                  }
+                });
+
+                for(var k in smanuCount)
+                {
+                  smanukeys.push(k);
+                  smanuvalues.push(smanuCount[k]);
+                  smanucolors.push('#'+Math.floor(Math.random()*16777215).toString(16));
+                }
+
+                var ctx = document.getElementById("stationManufacturerChart");
+                var data = {
+                    labels: smanukeys,
+                    datasets: [
+                        {
+                            data: smanuvalues,
+                            backgroundColor: smanucolors,
+                            hoverBackgroundColor: smanucolors
+                        }]
+                };
+                new Chart(ctx,{
+                  type:"doughnut",
+                  data: data,
+                  animation:{
+                      animateScale:true
+                  }
+                });
+              });
+              </script>
+            </div>
+          </div>
+
+          <h2 class="sub-header">Statistics</h2>
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody id="stats_table">
+              <script>
+              var num_beacons_total = 0;
+              var avg_beacons = 0;
+              var max_beacons = 0
+
+              var num_data_total = 0;
+              var avg_data = 0;
+              var max_data = 0;
+
+              var rssi_sum = 0;
+              var avg_rssi = 0;
+
+              var ap24count = 0;
+              var ap5count = 0;
+
+              var common_auth = {};
+              var common_cipher = {};
+
+              var max_speed = 0;
+              var min_speed = 1000000;
+
+              var suniqueAPs = [];
+
+              firebase.database().ref('ap_observations').once('value', function(snapshot)
+              {
+                snapshot.forEach(function(childSnapshot)
+                {
+                  var key = childSnapshot.key;
+                  var childData = childSnapshot.val();
+                  var hour = parseInt(childData.date.split(" ")[1].split(":")[0]);
+
+                  for(var k in childData.APs)
+                  {
+                    if(suniqueAPs.indexOf(childData.APs[k]['BSSID']) < 0)
+                    {
+                      suniqueAPs.push(childData.APs[k]['BSSID']);
+                      rssi_sum += parseInt(childData.APs[k]['power']);
+
+                      if(childData.APs[k]['channel'] != 'Unknown' && childData.APs[k]['channel'] != '-1')
+                      {
+                        if(parseInt(childData.APs[k]['channel']) <= 11)
+                        {
+                          ap24count += 1;
+                        }
+                        else if(parseInt(childData.APs[k]['channel']) >= 36)
+                        {
+                          ap5count += 1;
+                        }
+                      }
+
+                      if(!common_cipher[childData.APs[k]['cipher']])
+                      {
+                        common_cipher[childData.APs[k]['cipher']] = 1;
+                      }
+                      else
+                      {
+                        common_cipher[childData.APs[k]['cipher']] += 1;
+                      }
+
+                      if(!common_auth[childData.APs[k]['auth']])
+                      {
+                        common_auth[childData.APs[k]['auth']] = 1;
+                      }
+                      else
+                      {
+                        common_auth[childData.APs[k]['auth']] += 1;
+                      }
+                    }
+
+                    if(childData.APs[k]['speed'] != 'Unknown' && childData.APs[k]['speed'] != '-1')
+                    {
+                      if(parseInt(childData.APs[k]['speed']) > max_speed)
+                      {
+                        max_speed = parseInt(childData.APs[k]['speed']);
+                      }
+                      if(parseInt(childData.APs[k]['speed']) < min_speed)
+                      {
+                        min_speed = parseInt(childData.APs[k]['speed']);
+                      }
+                    }
+
+                    num_beacons_total += parseInt(childData.APs[k]['beacon_count']);
+                    if(parseInt(childData.APs[k]['beacon_count']) > max_beacons)
+                    {
+                      max_beacons = parseInt(childData.APs[k]['beacon_count']);
+                    }
+                    num_data_total += parseInt(childData.APs[k]['data_count']);
+                    if(parseInt(childData.APs[k]['data_count']) > max_data)
+                    {
+                      max_data = parseInt(childData.APs[k]['data_count']);
+                    }
+
+                  }
+                });
+                avg_beacons = num_beacons_total / suniqueAPs.length;
+                avg_data = num_data_total / suniqueAPs.length;
+                avg_rssi = rssi_sum / suniqueAPs.length;
+
+                var stats_str = "<tr><td>Unique APs</td><td>" + suniqueAPs.length + "</td></tr>";
+                stats_str += "<tr><td># 2.4 GHz APs</td><td>" + ap24count + "</td></tr>";
+                stats_str += "<tr><td># 5 GHz APs</td><td>" + ap5count + "</td></tr>";
+
+                var items = Object.keys(common_cipher).map(function(key) {
+                    return [key, common_cipher[key]];
+                });
+                items.sort(function(first, second) {
+                    return second[1] - first[1];
+                });
+                var tmp = items[0];
+                stats_str += "<tr><td>Most Common Cipher</td><td>" + tmp[0] + " (" + tmp[1] + " APs)"+ "</td></tr>";
+                items = Object.keys(common_auth).map(function(key) {
+                    return [key, common_auth[key]];
+                });
+                items.sort(function(first, second) {
+                    return second[1] - first[1];
+                });
+                var tmp = items[0];
+                stats_str += "<tr><td>Most Common Auth</td><td>" + tmp[0] + " (" + tmp[1] + " APs)"+ "</td></tr>";
+
+                stats_str += "<tr><td>Maximum AP Speed</td><td>" + max_speed + " Mbps</td></tr>";
+                stats_str += "<tr><td>Minimum AP Speed</td><td>" + min_speed + " Mbps</td></tr>";
+                stats_str += "<tr><td>Total Beacon Count</td><td>" + num_beacons_total + "</td></tr>";
+                stats_str += "<tr><td>Avg. Beacon Count</td><td>" + avg_beacons.toFixed(0) + "</td></tr>";
+                stats_str += "<tr><td>Total Data Count</td><td>" + num_data_total + "</td></tr>";
+                stats_str += "<tr><td>Avg. Data Count</td><td>" + avg_data.toFixed(0) + "</td></tr>";
+                stats_str += "<tr><td>Avg. RSSI</td><td>" + avg_rssi.toFixed(0) + "</td></tr>";
+
+                document.getElementById("stats_table").innerHTML = stats_str;
+              });
+              </script>
+              </tbody>
+            </table>
+          </div>
+
+          <h2 class="sub-header">ESSIDs</h2>
+          <h5>(With more than one AP)</h5>
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>ESSID</th>
+                  <th>Number of APs</th>
+                  <th>AP Manufacturer(s)</th>
+                </tr>
+              </thead>
+              <tbody id="essid_table">
+              <script>
+
+              var euniqueAPs = [];
+              var eManufacturers = [];
+
+              firebase.database().ref('ap_observations').once('value', function(snapshot)
+              {
+                snapshot.forEach(function(childSnapshot)
+                {
+                  var key = childSnapshot.key;
+                  var childData = childSnapshot.val();
+
+                  for(var k in childData.APs)
+                  {
+                    if(!euniqueAPs[childData.APs[k]['ESSID']])
+                    {
+                      euniqueAPs[childData.APs[k]['ESSID']] = 1;
+                      eManufacturers[childData.APs[k]['ESSID']] = [childData.APs[k]['manufacturer']];
+                    }
+                    else
+                    {
+                      euniqueAPs[childData.APs[k]['ESSID']] += 1;
+                      if(eManufacturers[childData.APs[k]['ESSID']].indexOf(childData.APs[k]['manufacturer']) < 0)
+                      {
+                        eManufacturers[childData.APs[k]['ESSID']].push(childData.APs[k]['manufacturer']);
+                      }
+                    }
+
+                  }
+
+                });
+
+                var essid_str = "";
+
+                for(var k in euniqueAPs)
+                {
+                  if(euniqueAPs[k] > 1 && k != '--' && k)
+                  {
+                    essid_str += "<tr><td>" + k + "</td><td>" + euniqueAPs[k] + "</td><td>" + eManufacturers[k] + "</td></tr>";
+                  }
+                }
+
+                document.getElementById("essid_table").innerHTML = essid_str;
+              });
+              </script>
+              </tbody>
+            </table>
+          </div>
+
+          <h2 class="sub-header">Mobile Devices</h2>
+          <h5>(Guessed based on station manufacturer)</h5>
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>Manufacturer</th>
+                  <th>Devices Seen</th>
+                </tr>
+              </thead>
+              <tbody id="mobile_table">
+              <script>
+
+              var mobileManufacturers = ['Apple', 'HUAWEI', 'TCT mobile', 'Motorola Mobility LLC', 'Microsoft Mobile', 'LG Electronics (Mobile Communications)', 'SAMSUNG', 'HTC', 'OnePlus Tech', 'Sony Mobile Communications'];
+              var mobileManufacturerCommonNames = ['Apple', 'Huawei', 'Alcatel', 'Motorola', 'Microsoft', 'LG', 'Samsung', 'HTC', 'OnePlus', 'Sony'];
+
+              function isMobileDevice(manufacturer)
+              {
+                  for(var i = 0; i < mobileManufacturers.length; i++)
+                  {
+                    if(manufacturer.toUpperCase().indexOf(mobileManufacturers[i].toUpperCase()) >= 0)
+                    {
+                      return mobileManufacturerCommonNames[i];
+                    }
+                  }
+                  return null;
+              }
+
+              var mobileuniqueDevices = [];
+
+              firebase.database().ref('station_observations').once('value', function(snapshot)
+              {
+                snapshot.forEach(function(childSnapshot)
+                {
+                  var key = childSnapshot.key;
+                  var childData = childSnapshot.val();
+
+                  for(var k in childData.stations)
+                  {
+                    var mobileManufacturer = isMobileDevice(String(childData.stations[k]['manufacturer']));
+                    if(mobileManufacturer != null)
+                    {
+                      if(!mobileuniqueDevices[mobileManufacturer])
+                      {
+                        mobileuniqueDevices[mobileManufacturer] = 1;
+                      }
+                      else
+                      {
+                        mobileuniqueDevices[mobileManufacturer] += 1;
+                      }
+                    }
+                  }
+                });
+
+                var mobile_str = "";
+                for(var k in mobileuniqueDevices)
+                {
+                  mobile_str += "<tr><td>" + k + "</td><td>" + mobileuniqueDevices[k] + "</td></tr>";
+                }
+
+                document.getElementById("mobile_table").innerHTML = mobile_str;
+              });
+              </script>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="scripts/jquery.min.js"><\/script>')</script>
+    <script src="scripts/bootstrap.min.js"></script>
+    <!-- Just to make our placeholder images work. Don't actually copy the next line! -->
+    <script src="scripts/holder.min.js"></script>
+    <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+    <script src="scripts/ie10-viewport-bug-workaround.js"></script>
+  </body>
+</html>

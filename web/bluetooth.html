@@ -1,0 +1,376 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="http://www.netscout.com/wp-content/themes/netscout/favicon.ico">
+
+    <title>Defcon Sensor Live Data</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.2.0/Chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.2.0/Chart.bundle.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/live/3.0/firebase.js"></script>
+    <script>
+      // Initialize Firebase
+      var config = {
+        apiKey: "AIzaSyDmD-Eye5CcB5sJBBqYaViCeCjpFwMsJ4o",
+        authDomain: "ns-sniffer.firebaseapp.com",
+        databaseURL: "https://ns-sniffer.firebaseio.com",
+        storageBucket: "ns-sniffer.appspot.com",
+      };
+      firebase.initializeApp(config);
+    </script>
+
+    <!-- Bootstrap core CSS -->
+    <link href="scripts/bootstrap.min.css" rel="stylesheet">
+
+    <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+    <link href="scripts/ie10-viewport-bug-workaround.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="scripts/dashboard.css" rel="stylesheet">
+
+    <!-- Just for debugging purposes. Don't actually copy these 2 lines! -->
+    <!--[if lt IE 9]><script src="../../assets/js/ie8-responsive-file-warning.js"></script><![endif]-->
+    <script src="scripts/ie-emulation-modes-warning.js"></script>
+
+    <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+    <script type="text/javascript">
+      /*firebase.database().ref('wbscan').once('value', function(snapshot)
+      {
+        var obj = snapshot.val();
+        var image_url = obj.wbscan_image_url;
+        var time = obj.time_of_scan
+        var sensorid = obj.sensor
+
+        var content = "<img src=\"" + image_url + "\"/></br></br>";
+        content += "<div align=\"left\"><table cellpadding=10 border=1px><tr><td><b>Sensor</b>:</td><td>" + sensorid + "</td></tr><tr><td><b>Time</b>:</td><td>" + time + "</td></tr><tr><td><b>Range</b>:</td><td>25 MHz - 1400 MHz</td></tr><tr><td><b>Gain</b>:</td><td>25 db</td></tr><tr><td><b>Bin Size</b>: </td><td>1 MHz</td></tr></table>";
+        console.log(content);
+        document.getElementById('wbsurvey').innerHTML = content;
+
+      });*/
+    </script>
+  </head>
+
+  <body>
+
+    <nav class="navbar navbar-inverse navbar-fixed-top">
+      <div class="container-fluid">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand">Defcon Live Sensor</a>
+        </div>
+        <div id="navbar" class="navbar-collapse collapse">
+
+        </div>
+      </div>
+    </nav>
+
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-sm-3 col-md-2 sidebar">
+          <ul class="nav nav-sidebar">
+            <li><a href="index.html">Overview <span class="sr-only">(current)</span></a></li>
+            <li><a href="80211.html">802.11</a></li>
+            <li class="active"><a>Bluetooth</a></li>
+          </ul>
+        </div>
+        <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+          <h1 class="page-header">Bluetooth Data</h1>
+
+          <div class="row placeholders">
+            <div class="col-xs-6 col-sm-3 placeholder">
+              <h4>Bluetooth Devices by Type</h4><br/>
+              <canvas id="bluetoothSummaryChart" width="600" height="400"></canvas>
+              <script>
+
+              var uniqueBT = [];
+              var uniqueBLE = [];
+
+              firebase.database().ref('bt_devices').once('value', function(snapshot)
+              {
+                snapshot.forEach(function(childSnapshot)
+                {
+                  var key = childSnapshot.key;
+                  var childData = childSnapshot.val();
+
+                  if(uniqueBT.indexOf(childData.MAC) < 0)
+                  {
+                      uniqueBT.push(childData.MAC);
+                  }
+
+                });
+
+                firebase.database().ref('ble_devices').once('value', function(snapshot)
+                {
+                  snapshot.forEach(function(childSnapshot)
+                  {
+                    var key = childSnapshot.key;
+                    var childData = childSnapshot.val();
+
+                    if(uniqueBLE.indexOf(childData.MAC) < 0)
+                    {
+                        uniqueBLE.push(childData.MAC);
+                    }
+
+                  });
+                  var ctx = document.getElementById("bluetoothSummaryChart");
+
+                  var data = {
+                  labels: ["Bluetooth", "Bluetooth LE"],
+                  datasets: [
+                      {
+                          label: "Unique Devices",
+                          backgroundColor: [
+                              'rgba(255, 99, 132, 0.2)',
+                              'rgba(54, 162, 235, 0.2)'
+                          ],
+                          borderColor: [
+                              'rgba(255,99,132,1)',
+                              'rgba(54, 162, 235, 1)'
+                          ],
+                          borderWidth: 1,
+                          data: [uniqueBT.length, uniqueBLE.length],
+                      }
+                  ]
+              };
+
+
+                  var myLineChart = new Chart(ctx, {
+                      type: 'bar',
+                      data: data,
+                      options: {legend: {display:false}, scales: {yAxes: [{display: true,ticks: {suggestedMin: 0,beginAtZero: true}}]}}
+                    });
+
+                });
+              });
+              </script>
+            </div>
+            <div class="col-xs-6 col-sm-3 placeholder">
+              <h4>Bluetooth Devices by Manufacturer</h4><br/>
+              <canvas id="bluetoothManufacturerChart" width="600" height="400"></canvas>
+              <script>
+              Chart.defaults.global.legend.display = false;
+              var uniqueDevices = [];
+              var manuCount = {};
+              var manukeys = [];
+              var manuvalues = [];
+              var manucolors = [];
+
+              firebase.database().ref('bt_devices').once('value', function(snapshot)
+              {
+                snapshot.forEach(function(childSnapshot)
+                {
+                  var key = childSnapshot.key;
+                  var childData = childSnapshot.val();
+
+                  var manufacturer =  childData.manufacturer;
+                  if(manufacturer != 'Unknown' && uniqueDevices.indexOf(childData.MAC) < 0)
+                  {
+                    uniqueDevices.push(childData.MAC);
+                    if(!manuCount[manufacturer])
+                    {
+                      manuCount[manufacturer] = 1;
+                    }
+                    else
+                    {
+                        manuCount[manufacturer] += 1;
+                    }
+                  }
+                });
+
+                firebase.database().ref('ble_devices').once('value', function(snapshot)
+                {
+                  snapshot.forEach(function(childSnapshot)
+                  {
+                    var childData = childSnapshot.val();
+
+                    var manufacturer =  childData.manufacturer;
+                    if(manufacturer != 'Unknown' && uniqueDevices.indexOf(childData.MAC) < 0)
+                    {
+                      uniqueDevices.push(childData.MAC);
+                      if(!manuCount[manufacturer])
+                      {
+                        manuCount[manufacturer] = 1;
+                      }
+                      else
+                      {
+                          manuCount[manufacturer] += 1;
+                      }
+                    }
+                  });
+
+                  for(var k in manuCount)
+                  {
+                    manukeys.push(k);
+                    manuvalues.push(manuCount[k]);
+                    manucolors.push('#'+Math.floor(Math.random()*16777215).toString(16));
+                  }
+
+                  var ctx = document.getElementById("bluetoothManufacturerChart");
+                  var data = {
+                      labels: manukeys,
+                      datasets: [
+                          {
+                              data: manuvalues,
+                              backgroundColor: manucolors,
+                              hoverBackgroundColor: manucolors
+                          }]
+                  };
+                  new Chart(ctx,{
+                    type:"doughnut",
+                    data: data,
+                    animation:{
+                        animateScale:true
+                    }
+                  });
+                });
+
+
+              });
+              </script>
+            </div>
+
+          </div>
+
+          <h2>Mobile Devices</h2>
+          <h5>(Based on Bluetooth devices and 802.11 stations with consecutive or equal MAC addresses)</h5>
+          <div class="sub-header"></div>
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Bluetooth MAC</th>
+                  <th>Station MAC</th>
+                </tr>
+              </thead>
+              <tbody id="mobile_devices_table">
+            <script>
+            var mobileStr = "";
+            var uniqueStations = [];
+            var uniqueBT = [];
+            var mobileDevices = [];
+
+            function lastOctetWithin(btmac, statmac, value)
+            {
+              btmac = btmac.replace(":", "");
+              statmac = statmac.replace(":", "");
+
+              if(btmac.substring(0,btmac.length-2) == statmac.substring(0, statmac.length-2))
+              {
+                var bLastOctet = parseInt(btmac.substring(btmac.length-2), 16);
+                var sLastOctet = parseInt(statmac.substring(statmac.length-2), 16);
+
+                if(Math.abs(bLastOctet - sLastOctet) == value || Math.abs(bLastOctet - sLastOctet) == 0)
+                {
+                  return true;
+                }
+              }
+
+              return false;
+            }
+
+            firebase.database().ref('station_observations').once('value', function(snapshot)
+            {
+              snapshot.forEach(function(childSnapshot)
+              {
+                var key = childSnapshot.key;
+                var childData = childSnapshot.val();
+
+                for(var k in childData.stations)
+                {
+                  if(uniqueStations.indexOf(childData.stations[k]['BSSID']) < 0)
+                  {
+                    uniqueStations.push(childData.stations[k]['BSSID']);
+                  }
+                }
+              });
+
+              firebase.database().ref('bt_devices').once('value', function(snapshot)
+              {
+                snapshot.forEach(function(childSnapshot)
+                {
+                  var key = childSnapshot.key;
+                  var childData = childSnapshot.val();
+
+                  if(uniqueBT.indexOf(childData.MAC) < 0)
+                  {
+                    uniqueBT.push(childData.MAC);
+                  }
+
+                });
+
+                firebase.database().ref('ble_devices').once('value', function(snapshot)
+                {
+                  snapshot.forEach(function(childSnapshot)
+                  {
+                    var key = childSnapshot.key;
+                    var childData = childSnapshot.val();
+
+                    if(uniqueBT.indexOf(childData.MAC) < 0)
+                    {
+                      uniqueBT.push(childData.MAC);
+                    }
+
+                  });
+
+                  for(var i = 0; i < uniqueBT.length; i++)
+                  {
+                    for(var j = 0; j < uniqueStations.length; j++)
+                    {
+                      if(lastOctetWithin(uniqueBT[i], uniqueStations[j], 1))
+                      {
+                        mobileDevices.push(uniqueBT[i] + "," + uniqueStations[j]);
+                      }
+                    }
+                  }
+
+                  for(var i = 0; i < mobileDevices.length; i++)
+                  {
+                    var tmp = mobileDevices[i].split(",");
+                    mobileStr += "<tr><td>" + (i+1) + "</td><td>" + tmp[0].substring(0,tmp[0].length-2) + "<font color=\"#ff0000\">" + tmp[0].substring(tmp[0].length-2) + "</font></td><td>" + tmp[1].substring(0,tmp[1].length-2) + "<font color=\"#ff0000\">" + tmp[1].substring(tmp[1].length-2) + "</td></tr>";
+                  }
+
+                  document.getElementById("mobile_devices_table").innerHTML = mobileStr;
+
+                });
+              });
+            });
+            </script>
+          </div>
+
+
+
+        </div>
+      </div>
+
+
+    </div>
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="scripts/jquery.min.js"><\/script>')</script>
+    <script src="scripts/bootstrap.min.js"></script>
+    <!-- Just to make our placeholder images work. Don't actually copy the next line! -->
+    <script src="scripts/holder.min.js"></script>
+    <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+    <script src="scripts/ie10-viewport-bug-workaround.js"></script>
+  </body>
+</html>
